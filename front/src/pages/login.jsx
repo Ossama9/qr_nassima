@@ -26,8 +26,9 @@ const Login = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Échec de la connexion");
 
-      localStorage.setItem("token", data.token);
-      router.push("/dashboard");
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("email", formData.email);
+      // router.push("/dashboard");
     } catch (error) {
       setError(error.message);
     } finally {

@@ -3,5 +3,7 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/login": "pages/login.js",
+  "/confirm": "pages/confirm.js",
+  "/attendance": "pages/attendance.js",
   "/register": "pages/register.js"
 }
