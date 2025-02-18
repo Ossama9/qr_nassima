@@ -140,6 +140,23 @@ def get_qrcodes(db: Session = Depends(get_db)):
         for qr in qrcodes
     ]
 
+@app.get("/qrcodes/{email}")
+def get_qrcodes_by_teacher(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email, User.role == "teacher").first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    qrcodes = db.query(QRCode).filter(QRCode.user_id == user.id).all()
+    return [
+        {
+            "id": qr.id,
+            "course": qr.course,
+            "qr_value": qr.qr_value,
+            "created_at": qr.created_at
+        }
+        for qr in qrcodes
+    ]
 
 @app.post("/register")
 def register(user: UserRegister, db: Session = Depends(get_db)):
@@ -162,7 +179,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     
     access_token = create_access_token(user.email)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "role": db_user.role}
 
 @app.post("/attendance")
 def mark_attendance(attendance: AttendanceSchema, db: Session = Depends(get_db)):
@@ -178,16 +195,84 @@ def mark_attendance(attendance: AttendanceSchema, db: Session = Depends(get_db))
 
 
 
+@app.get("/attendances/{email}")
+def get_attendances_by_student(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email, User.role == "student").first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    attendances = db.query(Attendance).filter(Attendance.user_id == user.id).all()
+    return [
+        {
+            "id": att.id,
+            "course": att.course,
+            "timestamp": att.timestamp
+        }
+        for att in attendances
+    ]
+
 @app.get("/attendance/{course}")
 def get_attendance(course: str, db: Session = Depends(get_db)):
-    attendances = db.query(Attendance).filter(Attendance.course == course).all()
-    return attendances
+    # Requête pour récupérer les présences avec jointure sur User
+    attendances = (
+        db.query(Attendance)
+        .join(User)  # Jointure sur la table User
+        .filter(Attendance.course == course, User.role == "student")  # Filtrer uniquement les étudiants
+        .all()
+    )
+
+    return [
+        {
+            "id": att.id,
+            "user_id": att.user_id,
+            "email": att.user.email,  # Email de l'étudiant
+            "timestamp": att.timestamp
+        }
+        for att in attendances
+    ]
 
 @app.get("/absentees")
 def get_absentees(db: Session = Depends(get_db)):
+    # Récupérer tous les cours qui ont un QR code
+    courses = db.query(QRCode.course).distinct().all()
+    courses = [c[0] for c in courses]  # Extraire les noms des cours
+
+    # Récupérer tous les étudiants
+    students = db.query(User).filter(User.role == "student").all()
+    
+    absentees = []
+    
+    for course in courses:
+        total_sessions = db.query(QRCode).filter(QRCode.course == course).count()  # Total de QR Codes pour ce cours
+
+        for student in students:
+            # Compter combien de fois cet étudiant a confirmé sa présence pour ce cours
+            attendance_count = db.query(Attendance).filter(
+                Attendance.user_id == student.id,
+                Attendance.course == course,
+                Attendance.confirmed == 1  # Seules les présences confirmées comptent
+            ).count()
+
+            absences = total_sessions - attendance_count
+
+            if absences > 0:
+                absentees.append({
+                    "user_id": student.id,
+                    "email": student.email,
+                    "course": course,  # Ajout du cours ici ✅
+                    "absences": absences
+                })
+
+    return absentees
+
+
+
+@app.get("/absenteesss")
+def get_absenteess(db: Session = Depends(get_db)):
     # Récupérer le nombre total de QR codes générés (donc de cours organisés)
     total_courses = db.query(QRCode).count()
-
+    print(total_courses)
     if total_courses == 0:
         return {"message": "Aucun cours n'a été généré"}
 
@@ -261,12 +346,6 @@ def confirm_attendance(
     db.commit()
     
     return {"success": True, "message": "Attendance created and confirmed successfully"}
-
-
-
-
-
-
 
 
 def create_default_user():

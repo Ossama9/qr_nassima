@@ -28,7 +28,8 @@ const Login = () => {
 
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("email", formData.email);
-      // router.push("/dashboard");
+      localStorage.setItem("role", data.role);
+      router.push("/dashboard");
     } catch (error) {
       setError(error.message);
     } finally {

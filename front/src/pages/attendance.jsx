@@ -34,7 +34,7 @@ const Attendance = () => {
   };
   
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 text-black">
       <div className="bg-white p-6 rounded-lg shadow-md text-center">
         <h2 className="text-2xl font-semibold mb-4">Générer un QR Code de Présence</h2>
         <input
