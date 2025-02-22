@@ -6,6 +6,8 @@ const Dashboard = () => {
     const [presences, setPresences] = useState([]);
     const [absences, setAbsences] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
+    const [selectedTab, setSelectedTab] = useState("presences"); // Ajout d'onglets
+
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -36,15 +38,36 @@ const Dashboard = () => {
 
         // 📌 Récupérer les QR Codes du professeur
         if (userRole === "student") {
+            // fetch(`http://localhost:8000/attendances/${email}`, {
+            //     method: "GET",
+            //     headers: { Authorization: `Bearer ${token}` },
+            // })
+            //     .then((res) => res.json())
+            //     .then((data) => {
+            //         setPresences(data);
+            //     })
+            //     .catch((error) => console.error("Erreur lors de la récupération des QR Codes :", error));
+            fetch(`http://localhost:8000/available_qrcodes`, {
+                method: "GET",
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    setQrCodes(data);
+                })
+                .catch((error) => console.error("Erreur lors de la récupération des QR Codes :", error));
+
+            // 📌 Récupérer les présences de l'étudiant
             fetch(`http://localhost:8000/attendances/${email}`, {
                 method: "GET",
                 headers: { Authorization: `Bearer ${token}` },
             })
                 .then((res) => res.json())
                 .then((data) => {
+                    console.log("📋 Présences récupérées :", data); // 🔍 Vérifier si les données arrivent
                     setPresences(data);
                 })
-                .catch((error) => console.error("Erreur lors de la récupération des QR Codes :", error));
+                .catch((error) => console.error("❌ Erreur lors de la récupération des présences :", error));
         }
 
         setLoading(false);
@@ -74,9 +97,24 @@ const Dashboard = () => {
             .catch((error) => console.error("Erreur lors de la récupération des absences :", error));
     };
 
+    // Fonction pour récupérer les QR Codes disponibles pour les étudiants
+    const fetchQrCodes = () => {
+        const token = localStorage.getItem("token");
+
+        fetch(`http://localhost:8000/qrcodes`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                setQrCodes(data);
+            })
+            .catch((error) => console.error("Erreur lors de la récupération des QR Codes :", error));
+    };
+
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 text-black">
-            <div className="bg-white p-6 rounded-lg shadow-md text-center w-full max-w-2xl">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-900">
+            <div className="bg-white p-8 rounded-2xl shadow-lg text-center w-full max-w-3xl border border-gray-200">
                 <h2 className="text-2xl font-semibold mb-4">Dashboard</h2>
 
                 {loading && <p className="text-gray-600">Chargement en cours...</p>}
@@ -121,22 +159,80 @@ const Dashboard = () => {
                     </div>
                 )}
 
-{role === "student" && (
-                    <div>
-                        <h3 className="text-lg font-semibold mb-4">📌 Mes presences</h3>
-
-                        {presences.length > 0 ? (
-                            <ul className="list-none text-left">
-                                {presences.map((presence, index) => (
-                                    <li key={index} className="text-gray-700 mb-4 p-3 border border-gray-300 rounded-md">
-                                        <strong>{presence.course} ¬ {presence.timestamp}</strong>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-gray-600">Aucun QR Code généré.</p>
+                {role === "student" && (
+                    <>
+                        <div className="flex gap-4 mb-6">
+                            <button
+                                className={`px-4 py-2 rounded-lg ${selectedTab === "presences" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+                                onClick={() => setSelectedTab("presences")}
+                            >📌 Mes Présences</button>
+                            <button
+                                className={`px-4 py-2 rounded-lg ${selectedTab === "qrcodes" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+                                onClick={() => setSelectedTab("qrcodes")}
+                            >📷 Scanner un QR Code / Marquer presence</button>
+                        </div>
+                        {selectedTab === "presences" && (
+                            <div>
+                                <h3 className="text-lg font-semibold mb-4">✅ Mes Présences</h3>
+                                {presences.length > 0 ? (
+                                    <table className="w-full border-collapse border border-gray-300">
+                                        <thead>
+                                            <tr className="bg-blue-600 text-white">
+                                                <th className="border border-gray-300 p-2">Cours</th>
+                                                <th className="border border-gray-300 p-2">Dates de présence</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {Object.entries(
+                                                presences.reduce((acc, presence) => {
+                                                    acc[presence.course] = acc[presence.course] || [];
+                                                    acc[presence.course].push(presence.timestamp);
+                                                    return acc;
+                                                }, {})
+                                            ).map(([course, dates]) => (
+                                                <tr key={course} className="border border-gray-300">
+                                                    <td className="p-2 border border-gray-300 font-semibold">{course}</td>
+                                                    <td className="p-2 border border-gray-300">
+                                                        {dates.map((date, index) => (
+                                                            <p key={index} className="text-gray-700">{new Date(date).toLocaleString()}</p>
+                                                        ))}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p className="text-gray-600">Aucune présence enregistrée.</p>
+                                )}
+                            </div>
                         )}
-                    </div>
+
+                        {selectedTab === "qrcodes" && (
+                            <div>
+                                <h3 className="text-lg font-semibold mb-4">📷 Scanner un QR Code</h3>
+                                {qrCodes.length > 0 ? (
+                                    <ul className="grid gap-4">
+                                        {qrCodes.map((qr, index) => (
+                                            <li key={index} className="p-4 bg-gray-100 rounded-lg shadow-sm border border-gray-300">
+                                                <strong className="block text-lg">{qr.course}</strong>
+                                                <a
+                                                    href={qr.qr_value}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 underline flex items-center mt-2"
+                                                >
+                                                    📷 Voir QR Code
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-gray-600">Aucun QR Code disponible.</p>
+                                )}
+                            </div>
+                        )}
+                    </>
+
                 )}
 
                 {selectedCourse && (
